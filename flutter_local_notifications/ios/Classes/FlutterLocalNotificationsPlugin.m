@@ -314,9 +314,11 @@ typedef NS_ENUM(NSInteger, RepeatInterval) {
         UNUserNotificationCenter *center =  [UNUserNotificationCenter currentNotificationCenter];
         [center removeAllPendingNotificationRequests];
         [center removeAllDeliveredNotifications];
+
     } else {
         [[UIApplication sharedApplication] cancelAllLocalNotifications];
     }
+    [[UIApplication sharedApplication] setApplicationIconBadgeNumber: 0];
     result(nil);
 }
 
