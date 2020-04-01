@@ -9,6 +9,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioAttributes;
@@ -42,6 +43,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -60,6 +63,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
+import io.flutter.view.FlutterMain;
 
 /**
  * FlutterLocalNotificationsPlugin
@@ -144,7 +148,7 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
             builder.setColor(notificationDetails.color.intValue());
         }
 
-        if (notificationDetails.showWhen != null){
+        if (notificationDetails.showWhen != null) {
             builder.setShowWhen(BooleanUtils.getValue(notificationDetails.showWhen));
         }
 
@@ -179,7 +183,7 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
 
     @NonNull
     static Gson buildGson() {
-        if(gson == null) {
+        if (gson == null) {
             RuntimeTypeAdapterFactory<StyleInformation> styleInformationAdapter =
                     RuntimeTypeAdapterFactory
                             .of(StyleInformation.class)
@@ -332,7 +336,7 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
 
     private static Bitmap getBitmapFromSource(Context context, String bitmapPath, BitmapSource bitmapSource) {
         Bitmap bitmap = null;
-        if (bitmapSource == BitmapSource.Drawable) {
+        if (bitmapSource == BitmapSource.DrawableResource) {
             bitmap = BitmapFactory.decodeResource(context.getResources(), getDrawableResourceId(context, bitmapPath));
         } else if (bitmapSource == BitmapSource.FilePath) {
             bitmap = BitmapFactory.decodeFile(bitmapPath);
@@ -344,14 +348,25 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
     private static IconCompat getIconFromSource(Context context, String iconPath, IconSource iconSource) {
         IconCompat icon = null;
         switch (iconSource) {
-            case Drawable:
+            case DrawableResource:
                 icon = IconCompat.createWithResource(context, getDrawableResourceId(context, iconPath));
                 break;
-            case FilePath:
+            case BitmapFilePath:
                 icon = IconCompat.createWithBitmap(BitmapFactory.decodeFile(iconPath));
                 break;
             case ContentUri:
                 icon = IconCompat.createWithContentUri(iconPath);
+                break;
+            case FlutterBitmapAsset:
+                try {
+                    AssetFileDescriptor assetFileDescriptor = context.getAssets().openFd(FlutterMain.getLookupKeyForAsset(iconPath));
+                    FileInputStream fileInputStream = assetFileDescriptor.createInputStream();
+                    icon = IconCompat.createWithBitmap(BitmapFactory.decodeStream(fileInputStream));
+                    fileInputStream.close();
+                    assetFileDescriptor.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
                 break;
             default:
                 break;
@@ -361,8 +376,9 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
 
     /**
      * Sets the visibility property to the input Notification Builder
+     *
      * @throws IllegalArgumentException If `notificationDetails.visibility` is not null but also
-     * not matches any known index.
+     *                                  not matches any known index.
      */
     private static void setVisibility(NotificationDetails notificationDetails, NotificationCompat.Builder builder) {
         if (notificationDetails.visibility == null) {
@@ -389,7 +405,7 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
     }
 
     private static void applyGrouping(NotificationDetails notificationDetails, NotificationCompat.Builder builder) {
-        Boolean isGrouped = false;
+        boolean isGrouped = false;
         if (!StringUtils.isNullOrEmpty(notificationDetails.groupKey)) {
             builder.setGroup(notificationDetails.groupKey);
             isGrouped = true;
@@ -430,14 +446,14 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
     }
 
     private static void setCategory(NotificationDetails notificationDetails, NotificationCompat.Builder builder) {
-        if(notificationDetails.category == null) {
+        if (notificationDetails.category == null) {
             return;
         }
         builder.setCategory(notificationDetails.category);
     }
 
     private static void setTimeoutAfter(NotificationDetails notificationDetails, NotificationCompat.Builder builder) {
-        if(notificationDetails.timeoutAfter == null) {
+        if (notificationDetails.timeoutAfter == null) {
             return;
         }
         builder.setTimeoutAfter(notificationDetails.timeoutAfter);
@@ -539,8 +555,8 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
             messagingStyle.setConversationTitle(messagingStyleInformation.conversationTitle);
         }
         if (messagingStyleInformation.messages != null && !messagingStyleInformation.messages.isEmpty()) {
-            for (Iterator<MessageDetails> it = messagingStyleInformation.messages.iterator(); it.hasNext(); ) {
-                NotificationCompat.MessagingStyle.Message message = createMessage(context, it.next());
+            for (MessageDetails messageDetails : messagingStyleInformation.messages) {
+                NotificationCompat.MessagingStyle.Message message = createMessage(context, messageDetails);
                 messagingStyle.addMessage(message);
             }
         }
@@ -628,13 +644,17 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
     }
 
     private static Uri retrieveSoundResourceUri(Context context, NotificationDetails notificationDetails) {
-        Uri uri;
+        Uri uri = null;
         if (StringUtils.isNullOrEmpty(notificationDetails.sound)) {
             uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         } else {
-
-            int soundResourceId = context.getResources().getIdentifier(notificationDetails.sound, "raw", context.getPackageName());
-            return Uri.parse("android.resource://" + context.getPackageName() + "/" + soundResourceId);
+            // allow null as soundSource was added later and prior to that, it was assumed to be a raw resource
+            if (notificationDetails.soundSource == null || notificationDetails.soundSource == SoundSource.RawResource) {
+                int soundResourceId = context.getResources().getIdentifier(notificationDetails.sound, "raw", context.getPackageName());
+                uri = Uri.parse("android.resource://" + context.getPackageName() + "/" + soundResourceId);
+            } else if (notificationDetails.soundSource == SoundSource.Uri) {
+                uri = Uri.parse(notificationDetails.sound);
+            }
         }
         return uri;
     }
@@ -827,7 +847,7 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
         if (hasInvalidIcon(result, notificationDetails.icon) ||
                 hasInvalidLargeIcon(result, notificationDetails.largeIcon, notificationDetails.largeIconBitmapSource) ||
                 hasInvalidBigPictureResources(result, notificationDetails) ||
-                hasInvalidSound(result, notificationDetails.sound) ||
+                hasInvalidRawSoundResource(result, notificationDetails) ||
                 hasInvalidLedDetails(result, notificationDetails)) {
             return null;
         }
@@ -843,9 +863,9 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
         return false;
     }
 
-    private boolean hasInvalidSound(Result result, String sound) {
-        if (!StringUtils.isNullOrEmpty(sound)) {
-            int soundResourceId = applicationContext.getResources().getIdentifier(sound, "raw", applicationContext.getPackageName());
+    private boolean hasInvalidRawSoundResource(Result result, NotificationDetails notificationDetails) {
+        if (!StringUtils.isNullOrEmpty(notificationDetails.sound) && (notificationDetails.soundSource == null || notificationDetails.soundSource == SoundSource.RawResource)) {
+            int soundResourceId = applicationContext.getResources().getIdentifier(notificationDetails.sound, "raw", applicationContext.getPackageName());
             if (soundResourceId == 0) {
                 result.error(INVALID_SOUND_ERROR_CODE, INVALID_RAW_RESOURCE_ERROR_MESSAGE, null);
                 return true;
@@ -859,13 +879,13 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
             BigPictureStyleInformation bigPictureStyleInformation = (BigPictureStyleInformation) notificationDetails.styleInformation;
             if (hasInvalidLargeIcon(result, bigPictureStyleInformation.largeIcon, bigPictureStyleInformation.largeIconBitmapSource))
                 return true;
-            return bigPictureStyleInformation.bigPictureBitmapSource == BitmapSource.Drawable && !isValidDrawableResource(applicationContext, bigPictureStyleInformation.bigPicture, result, INVALID_BIG_PICTURE_ERROR_CODE);
+            return bigPictureStyleInformation.bigPictureBitmapSource == BitmapSource.DrawableResource && !isValidDrawableResource(applicationContext, bigPictureStyleInformation.bigPicture, result, INVALID_BIG_PICTURE_ERROR_CODE);
         }
         return false;
     }
 
     private boolean hasInvalidLargeIcon(Result result, String largeIcon, BitmapSource largeIconBitmapSource) {
-        return !StringUtils.isNullOrEmpty(largeIcon) && largeIconBitmapSource == BitmapSource.Drawable && !isValidDrawableResource(applicationContext, largeIcon, result, INVALID_LARGE_ICON_ERROR_CODE);
+        return !StringUtils.isNullOrEmpty(largeIcon) && largeIconBitmapSource == BitmapSource.DrawableResource && !isValidDrawableResource(applicationContext, largeIcon, result, INVALID_LARGE_ICON_ERROR_CODE);
     }
 
     private boolean hasInvalidIcon(Result result, String icon) {
@@ -905,8 +925,8 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
 
     @Override
     public boolean onNewIntent(Intent intent) {
-        boolean res =  sendNotificationPayloadMessage(intent);
-        if(res && mainActivity != null) {
+        boolean res = sendNotificationPayloadMessage(intent);
+        if (res && mainActivity != null) {
             mainActivity.setIntent(intent);
         }
         return res;

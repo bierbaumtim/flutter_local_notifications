@@ -292,6 +292,13 @@ class _HomePageState extends State<HomePage> {
                   ),
                   PaddedRaisedButton(
                     buttonText:
+                        'Show notification using Android Uri sound [Android]',
+                    onPressed: () async {
+                      await _showSoundUriNotification();
+                    },
+                  ),
+                  PaddedRaisedButton(
+                    buttonText:
                         'Show notification that times out after 3 seconds [Android]',
                     onPressed: () async {
                       await _showTimeoutNotification();
@@ -449,9 +456,8 @@ class _HomePageState extends State<HomePage> {
         'your other channel name',
         'your other channel description',
         icon: 'secondary_icon',
-        sound: 'slow_spring_board',
-        largeIcon: 'sample_large_icon',
-        largeIconBitmapSource: BitmapSource.Drawable,
+        sound: RawResourceAndroidNotificationSound('slow_spring_board'),
+        largeIcon: DrawableResourceAndroidBitmap('sample_large_icon'),
         vibrationPattern: vibrationPattern,
         enableLights: true,
         color: const Color.fromARGB(255, 255, 0, 0),
@@ -485,6 +491,24 @@ class _HomePageState extends State<HomePage> {
         '<b>silent</b> body', platformChannelSpecifics);
   }
 
+  Future<void> _showSoundUriNotification() async {
+    // this calls a method over a platform channel implemented within the example app to return the Uri for the default
+    // alarm sound and uses as the notification sound
+    String alarmUri = await platform.invokeMethod('getAlarmUri');
+    final x = UriAndroidNotificationSound(alarmUri);
+    var androidPlatformChannelSpecifics = AndroidNotificationDetails(
+        'uri channel id', 'uri channel name', 'uri channel description',
+        sound: x,
+        playSound: true,
+        styleInformation: DefaultStyleInformation(true, true));
+    var iOSPlatformChannelSpecifics =
+        IOSNotificationDetails(presentSound: false);
+    var platformChannelSpecifics = NotificationDetails(
+        androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
+    await flutterLocalNotificationsPlugin.show(
+        0, 'uri sound title', 'uri sound body', platformChannelSpecifics);
+  }
+
   Future<void> _showTimeoutNotification() async {
     var androidPlatformChannelSpecifics = AndroidNotificationDetails(
         'silent channel id',
@@ -515,9 +539,8 @@ class _HomePageState extends State<HomePage> {
     var bigPicturePath = await _downloadAndSaveFile(
         'http://via.placeholder.com/400x800', 'bigPicture');
     var bigPictureStyleInformation = BigPictureStyleInformation(
-        bigPicturePath, BitmapSource.FilePath,
-        largeIcon: largeIconPath,
-        largeIconBitmapSource: BitmapSource.FilePath,
+        FilePathAndroidBitmap(bigPicturePath),
+        largeIcon: FilePathAndroidBitmap(largeIconPath),
         contentTitle: 'overridden <b>big</b> content title',
         htmlFormatContentTitle: true,
         summaryText: 'summary <i>text</i>',
@@ -526,7 +549,6 @@ class _HomePageState extends State<HomePage> {
         'big text channel id',
         'big text channel name',
         'big text channel description',
-        style: AndroidNotificationStyle.BigPicture,
         styleInformation: bigPictureStyleInformation);
     var platformChannelSpecifics =
         NotificationDetails(androidPlatformChannelSpecifics, null);
@@ -540,7 +562,7 @@ class _HomePageState extends State<HomePage> {
     var bigPicturePath = await _downloadAndSaveFile(
         'http://via.placeholder.com/400x800', 'bigPicture');
     var bigPictureStyleInformation = BigPictureStyleInformation(
-        bigPicturePath, BitmapSource.FilePath,
+        FilePathAndroidBitmap(bigPicturePath),
         hideExpandedLargeIcon: true,
         contentTitle: 'overridden <b>big</b> content title',
         htmlFormatContentTitle: true,
@@ -550,9 +572,7 @@ class _HomePageState extends State<HomePage> {
         'big text channel id',
         'big text channel name',
         'big text channel description',
-        largeIcon: largeIconPath,
-        largeIconBitmapSource: BitmapSource.FilePath,
-        style: AndroidNotificationStyle.BigPicture,
+        largeIcon: FilePathAndroidBitmap(largeIconPath),
         styleInformation: bigPictureStyleInformation);
     var platformChannelSpecifics =
         NotificationDetails(androidPlatformChannelSpecifics, null);
@@ -567,9 +587,8 @@ class _HomePageState extends State<HomePage> {
       'media channel id',
       'media channel name',
       'media channel description',
-      largeIcon: largeIconPath,
-      largeIconBitmapSource: BitmapSource.FilePath,
-      style: AndroidNotificationStyle.Media,
+      largeIcon: FilePathAndroidBitmap(largeIconPath),
+      styleInformation: MediaStyleInformation(),
     );
     var platformChannelSpecifics =
         NotificationDetails(androidPlatformChannelSpecifics, null);
@@ -589,7 +608,6 @@ class _HomePageState extends State<HomePage> {
         'big text channel id',
         'big text channel name',
         'big text channel description',
-        style: AndroidNotificationStyle.BigText,
         styleInformation: bigTextStyleInformation);
     var platformChannelSpecifics =
         NotificationDetails(androidPlatformChannelSpecifics, null);
@@ -609,7 +627,6 @@ class _HomePageState extends State<HomePage> {
         htmlFormatSummaryText: true);
     var androidPlatformChannelSpecifics = AndroidNotificationDetails(
         'inbox channel id', 'inboxchannel name', 'inbox channel description',
-        style: AndroidNotificationStyle.Inbox,
         styleInformation: inboxStyleInformation);
     var platformChannelSpecifics =
         NotificationDetails(androidPlatformChannelSpecifics, null);
@@ -624,27 +641,27 @@ class _HomePageState extends State<HomePage> {
     var messages = List<Message>();
     // First two person objects will use icons that part of the Android app's drawable resources
     var me = Person(
-        name: 'Me',
-        key: '1',
-        uri: 'tel:1234567890',
-        icon: 'me',
-        iconSource: IconSource.Drawable);
+      name: 'Me',
+      key: '1',
+      uri: 'tel:1234567890',
+      icon: DrawableResourceAndroidIcon('me'),
+    );
     var coworker = Person(
-        name: 'Coworker',
-        key: '2',
-        uri: 'tel:9876543210',
-        icon: 'coworker',
-        iconSource: IconSource.Drawable);
+      name: 'Coworker',
+      key: '2',
+      uri: 'tel:9876543210',
+      icon: FlutterBitmapAssetAndroidIcon('icons/coworker.png'),
+    );
     // download the icon that would be use for the lunch bot person
     var largeIconPath = await _downloadAndSaveFile(
         'http://via.placeholder.com/48x48', 'largeIcon');
     // this person object will use an icon that was downloaded
     var lunchBot = Person(
-        name: 'Lunch bot',
-        key: 'bot',
-        bot: true,
-        icon: largeIconPath,
-        iconSource: IconSource.FilePath);
+      name: 'Lunch bot',
+      key: 'bot',
+      bot: true,
+      icon: BitmapFilePathAndroidIcon(largeIconPath),
+    );
     messages.add(Message('Hi', DateTime.now(), null));
     messages.add(Message(
         'What\'s up?', DateTime.now().add(Duration(minutes: 5)), coworker));
@@ -664,7 +681,6 @@ class _HomePageState extends State<HomePage> {
         'message channel name',
         'message channel description',
         category: 'msg',
-        style: AndroidNotificationStyle.Messaging,
         styleInformation: messagingStyle);
     var platformChannelSpecifics =
         NotificationDetails(androidPlatformChannelSpecifics, null);
@@ -717,7 +733,6 @@ class _HomePageState extends State<HomePage> {
         contentTitle: '2 messages', summaryText: 'janedoe@example.com');
     var androidPlatformChannelSpecifics = AndroidNotificationDetails(
         groupChannelId, groupChannelName, groupChannelDescription,
-        style: AndroidNotificationStyle.Inbox,
         styleInformation: inboxStyleInformation,
         groupKey: groupKey,
         setAsGroupSummary: true);
@@ -946,12 +961,11 @@ class _HomePageState extends State<HomePage> {
     var iOSPlatformChannelSpecifics = IOSNotificationDetails(
         attachments: [IOSNotificationAttachment(bigPicturePath)]);
     var bigPictureAndroidStyle =
-        BigPictureStyleInformation(bigPicturePath, BitmapSource.FilePath);
+        BigPictureStyleInformation(FilePathAndroidBitmap(bigPicturePath));
     var androidPlatformChannelSpecifics = AndroidNotificationDetails(
         'your channel id', 'your channel name', 'your channel description',
         importance: Importance.High,
         priority: Priority.High,
-        style: AndroidNotificationStyle.BigPicture,
         styleInformation: bigPictureAndroidStyle);
     var notificationDetails = NotificationDetails(
         androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
