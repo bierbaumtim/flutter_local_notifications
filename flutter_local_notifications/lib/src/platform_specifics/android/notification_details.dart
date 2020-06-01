@@ -35,6 +35,7 @@ class AndroidNotificationDetails {
     this.largeIcon,
     this.onlyAlertOnce,
     this.showWhen = true,
+    this.when,
     this.channelShowBadge = true,
     this.showProgress = false,
     this.maxProgress = 0,
@@ -49,6 +50,7 @@ class AndroidNotificationDetails {
     this.visibility,
     this.timeoutAfter,
     this.category,
+    this.additionalFlags,
   });
 
   /// The icon that should be used when displaying the notification.
@@ -119,7 +121,7 @@ class AndroidNotificationDetails {
   /// Specifies if this notification will function as the summary for grouped notifications.
   final bool setAsGroupSummary;
 
-  /// Sets the group alert behavior for this notification.
+  /// Specifies the group alert behavior for this notification.
   ///
   /// Default is AlertAll.
   /// See https://developer.android.com/reference/android/support/v4/app/NotificationCompat.Builder.html#setGroupAlertBehavior(int) for more details.
@@ -131,7 +133,7 @@ class AndroidNotificationDetails {
   /// Specifies if the notification will be "ongoing".
   final bool ongoing;
 
-  /// Sets the color.
+  /// Specifies the color.
   final Color color;
 
   /// Specifics the large icon to use.
@@ -141,7 +143,19 @@ class AndroidNotificationDetails {
   final bool onlyAlertOnce;
 
   /// Specifies if the notification should display the timestamp of when it occurred.
+  ///
+  /// To control the actual timestamp of the notification, use [when].
   final bool showWhen;
+
+  /// Specifies the timestamp of the notification.
+  ///
+  /// To control whether the timestamp is shown in the notification, use
+  /// [showWhen].
+  ///
+  /// The timestamp is expressed as the number of milliseconds since the "Unix epoch" 1970-01-01T00:00:00Z (UTC).
+  /// If it's not specified but a timestamp should be shown (i.e. [showWhen] is set to `true`),
+  /// then Android will default to showing when the notification occurred.
+  final int when;
 
   /// Specifies if the notification will be used to show progress.
   final bool showProgress;
@@ -155,22 +169,22 @@ class AndroidNotificationDetails {
   /// Specifies if an indeterminate progress bar will be shown.
   final bool indeterminate;
 
-  /// Sets the light color of the notification.
+  /// Specifies the light color of the notification.
   ///
   /// For Android 8.0+, this is tied to the specified channel cannot be changed afterward the channel has been created for the first time.
   final Color ledColor;
 
-  /// Sets how long the light colour will remain on.
+  /// Specifies how long the light colour will remain on.
   ///
   /// Not applicable for Android 8.0+
   final int ledOnMs;
 
-  /// Sets how long the light colour will remain off.
+  /// Specifies how long the light colour will remain off.
   ///
   /// Not applicable for Android 8.0+
   final int ledOffMs;
 
-  /// Set the "ticker" text which is sent to accessibility services.
+  /// Specifies the "ticker" text which is sent to accessibility services.
   final String ticker;
 
   /// The action to take for managing notification channels.
@@ -188,6 +202,13 @@ class AndroidNotificationDetails {
   ///
   /// Refer to Android notification API documentation at https://developer.android.com/reference/androidx/core/app/NotificationCompat.html#constants_2 for the available categories
   final String category;
+
+  /// Specifies the additional flags.
+  ///
+  /// These flags will get added to the native Android notification's flags field: https://developer.android.com/reference/android/app/Notification#flags
+  /// For a list of a values, refer to the documented constants prefixed with "FLAG_" (without the quotes) at https://developer.android.com/reference/android/app/Notification.html#constants_1.
+  /// For example, use a value of 4 to allow the audio to repeat as documented at https://developer.android.com/reference/android/app/Notification.html#FLAG_INSISTEN
+  final Int32List additionalFlags;
 
   /// Creates a [Map] object that describes the [AndroidNotificationDetails] object.
   ///
@@ -216,6 +237,7 @@ class AndroidNotificationDetails {
       'colorBlue': color?.blue,
       'onlyAlertOnce': onlyAlertOnce,
       'showWhen': showWhen,
+      'when': when,
       'showProgress': showProgress,
       'maxProgress': maxProgress,
       'progress': progress,
@@ -230,7 +252,8 @@ class AndroidNotificationDetails {
       'ticker': ticker,
       'visibility': visibility?.index,
       'timeoutAfter': timeoutAfter,
-      'category': category
+      'category': category,
+      'additionalFlags': additionalFlags
     }
       ..addAll(_convertStyleInformationToMap())
       ..addAll(_convertSoundToMap())

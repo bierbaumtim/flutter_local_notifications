@@ -102,6 +102,8 @@ public class NotificationDetails {
     private static final String CATEGORY = "category";
     private static final String TIMEOUT_AFTER = "timeoutAfter";
     private static final String SHOW_WHEN = "showWhen";
+    private static final String WHEN = "when";
+    private static final String ADDITIONAL_FLAGS = "additionalFlags";
 
 
     public Integer id;
@@ -150,7 +152,9 @@ public class NotificationDetails {
     public Boolean allowWhileIdle;
     public Long timeoutAfter;
     public String category;
+    public int[] additionalFlags;
     public Boolean showWhen;
+    public Long when;
 
 
 
@@ -200,6 +204,7 @@ public class NotificationDetails {
             readGroupingInformation(notificationDetails, platformChannelSpecifics);
             notificationDetails.onlyAlertOnce = (Boolean) platformChannelSpecifics.get(ONLY_ALERT_ONCE);
             notificationDetails.showWhen = (Boolean) platformChannelSpecifics.get(SHOW_WHEN);
+            notificationDetails.when = parseLong(platformChannelSpecifics.get(WHEN));
             readProgressInformation(notificationDetails, platformChannelSpecifics);
             readColor(notificationDetails, platformChannelSpecifics);
             readChannelInformation(notificationDetails, platformChannelSpecifics);
@@ -208,17 +213,20 @@ public class NotificationDetails {
             notificationDetails.ticker = (String) platformChannelSpecifics.get(TICKER);
             notificationDetails.visibility = (Integer) platformChannelSpecifics.get(VISIBILITY);
             notificationDetails.allowWhileIdle = (Boolean) platformChannelSpecifics.get(ALLOW_WHILE_IDLE);
-            Object timeoutAfter =  platformChannelSpecifics.get(TIMEOUT_AFTER);
-            if(timeoutAfter != null) {
-                if(timeoutAfter instanceof Integer) {
-                    notificationDetails.timeoutAfter = ((Integer) timeoutAfter).longValue();
-                }
-                else if(timeoutAfter instanceof Long) {
-                    notificationDetails.timeoutAfter = (Long) timeoutAfter;
-                }
-            }
+            notificationDetails.timeoutAfter = parseLong(platformChannelSpecifics.get(TIMEOUT_AFTER));
             notificationDetails.category = (String) platformChannelSpecifics.get(CATEGORY);
+            notificationDetails.additionalFlags = (int[]) platformChannelSpecifics.get(ADDITIONAL_FLAGS);
         }
+    }
+
+    private static Long parseLong(Object object) {
+        if (object instanceof Integer) {
+            return ((Integer) object).longValue();
+        }
+        if (object instanceof Long) {
+            return (Long) object;
+        }
+        return null;
     }
 
     private static void readProgressInformation(NotificationDetails notificationDetails, Map<String, Object> platformChannelSpecifics) {

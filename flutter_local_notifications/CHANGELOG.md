@@ -1,3 +1,19 @@
+# [1.4.4]
+
+* [iOS] Fixes to ensure that the native completion handlers were called appropriately. If you had some issues using this plugin combined with push notifications (e.g. via `firebase_messaging`) when the app was in the foreground then I would recommend updating to this version. Thanks to [Paweł Szot](https://github.com/szotp) for picking up the gap in the code in handling the native `willPresentNotification` call
+* The readme has been been touched up and had some sections rearranged. Thanks to the PR from [psyanite](https://github.com/psyanite)
+* Bumped lower bound of Dart SDK dependency to 2.0
+
+# [1.4.3]
+
+* [Android] added the ability to specify additional flags for the notification. For example, this could be used to allow the audio to repeat. See the API docs and update example app for more details. Thanks to the PR from [andylei](https://github.com/andylei)
+* Minor cleanup of API docs
+
+# [1.4.2]
+
+* [Android] added the ability to specify the timestamp shown in the notification (issue [596](https://github.com/MaikuB/flutter_local_notifications/issues/596)). Thanks to the PR from [Nicolas Schneider](https://github.com/nioncode).
+* Fixed API docs for `showWeeklyAtDayAndTime`
+
 # [1.4.1]
 
 * [Android] added the ability to create notification channels before a notification is shown. This can be done by calling the `createNotificationChannel` within the `AndroidFlutterLocalNotificationsPlugin` class. This allows applications to create notification channels before a notification is shown. Thanks to the PR from [Vladimir Gerashchenko](https://github.com/ZaarU).
