@@ -523,6 +523,7 @@ static FlutterError *getFlutterError(NSError *error) {
 }
 
 - (void)cancelAll:(FlutterResult _Nonnull) result {
+    [[UIApplication sharedApplication] setApplicationIconBadgeNumber: 0];
     if(@available(iOS 10.0, *)) {
         UNUserNotificationCenter *center =  [UNUserNotificationCenter currentNotificationCenter];
         [center removeAllPendingNotificationRequests];
