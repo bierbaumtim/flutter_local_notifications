@@ -80,6 +80,7 @@ A cross platform plugin for displaying local notifications.
 * [Android] Configure notification visibility on the lockscreen
 * [Android] Ability to create and delete notification channels
 * [Android] Retrieve the list of active notifications
+* [Android] Full-screen intent notifications
 * [iOS (all supported versions) & macOS 10.14+] Request notification permissions and customise the permissions being requested around displaying notifications
 * [iOS 10 or newer and macOS 10.14 or newer] Display notifications with attachments
 
@@ -154,6 +155,8 @@ The following is also needed to ensure notifications remain scheduled upon a reb
     <intent-filter>
         <action android:name="android.intent.action.BOOT_COMPLETED"/>
         <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
     </intent-filter>
 </receiver>
 ```
@@ -171,7 +174,7 @@ If the vibration pattern of an Android notification will be customised then add 
 ```
 
 
-#### Fullscreen intent notifications
+#### Full-screen intent notifications
 
 If your application needs the ability to schedule full-screen intent notifications, add the following to the manifest (i.e. your application's `AndroidManifest.xml` file)
 
@@ -187,7 +190,9 @@ These make sure the screen turns on and shows when the device is locked.
     android:turnScreenOn="true">
 ```
 
-For reference, the example app's `AndroidManifest.xml` file can be found [here](https://github.com/MaikuB/flutter_local_notifications/blob/master/flutter_local_notifications/example/android/app/src/main/AndroidManifest.xml)
+For reference, the example app's `AndroidManifest.xml` file can be found [here](https://github.com/MaikuB/flutter_local_notifications/blob/master/flutter_local_notifications/example/android/app/src/main/AndroidManifest.xml).
+
+Note that when a full-screen intent notification actually occurs (as opposed to a heads-up notification that the system may decide should occur), the plugin will act as though the user has tapped on a notification so handle those the same way (e.g. `onSelectNotification` callback) to display the appropriate page for your application.
 
 
 #### Release build configuration
@@ -225,7 +230,7 @@ if #available(iOS 10.0, *) {
 ```
 
 #### Handling notifications whilst the app is in the foreground
-By design, iOS applications *do not* display notifications the app is in the foreground. 
+By design, iOS applications *do not* display notifications while the app is in the foreground. 
 
 For iOS 10+, use the presentation options to control the behaviour for when a notification is triggered while the app is in the foreground. 
 
@@ -241,7 +246,8 @@ final IOSInitializationSettings initializationSettingsIOS =
     IOSInitializationSettings(
         onDidReceiveLocalNotification: onDidReceiveLocalNotification);
 final InitializationSettings initializationSettings = InitializationSettings(
-    initializationSettingsAndroid, initializationSettingsIOS);
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS);
 flutterLocalNotificationsPlugin.initialize(initializationSettings,
     onSelectNotification: onSelectNotification);
 
@@ -415,7 +421,7 @@ In this block of code, the details specific to the Android platform is specified
 
 ### Scheduling a notification
 
-Starting in version 1.5 of the plugin, scheduling notifications now requires developers to specify a date and time relative to a specific time zone. This is to solve issues with daylight savings that existed in the `schedule` method that is now deprecated. A new `zonedSchedule` method is provided that expects an instance `TZDateTime` class provided by the [`timezone`](https://pub.dev/packages/timezone) package. As the `flutter_local_notifications` plugin already depends on the `timezone` package, it's not necessary for developers to add the `timezone` package as a direct dependency. In other words, the `timezone` package will be a transitive dependency after you add the `flutter_local_notifications` plugin as a dependency in your application.
+Starting in version 2.0 of the plugin, scheduling notifications now requires developers to specify a date and time relative to a specific time zone. This is to solve issues with daylight savings that existed in the `schedule` method that is now deprecated. A new `zonedSchedule` method is provided that expects an instance `TZDateTime` class provided by the [`timezone`](https://pub.dev/packages/timezone) package. As the `flutter_local_notifications` plugin already depends on the `timezone` package, it's not necessary for developers to add the `timezone` package as a direct dependency. In other words, the `timezone` package will be a transitive dependency after you add the `flutter_local_notifications` plugin as a dependency in your application.
 
 Usage of the `timezone` package requires initialisation that is covered in the package's readme. For convenience the following are code snippets used by the example app.
 
@@ -460,7 +466,9 @@ On Android, the `androidAllowWhileIdle` is used to determine if the notification
 
 The `uiLocalNotificationDateInterpretation` is required as on iOS versions older than 10 as time zone support is limited. This means it's not possible schedule a notification for another time zone and have iOS adjust the time the notification will appear when daylight savings happens. With this parameter, it is used to determine if the scheduled date should be interpreted as absolute time or wall clock time.
 
-There is an optional `scheduledNotificationRepeatFrequency` parameter that can be used to schedule a notification to appear on a daily or weekly basis.
+There is an optional `matchDateTimeComponents` parameter that can be used to schedule a notification to appear on a daily or weekly basis by telling the plugin to match on the time or a combination of day of the week and time respectively.
+
+If you are trying to update your code so it doesn't use the deprecated methods for showing daily or weekly notifications that occur on a specific day of the week then you'll need to perform calculations that would determine the next instance of a date that meets the conditions for your application. See the example application that shows one of the ways that can be done e.g. how schedule a weekly notification to occur on Monday 10:00AM.
 
 ### Periodically show a notification with a specified interval
 

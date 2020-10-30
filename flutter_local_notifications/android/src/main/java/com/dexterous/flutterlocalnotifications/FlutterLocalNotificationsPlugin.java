@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
+import android.app.NotificationChannelGroup;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -28,10 +29,12 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.Person;
 import androidx.core.graphics.drawable.IconCompat;
 
+import com.dexterous.flutterlocalnotifications.models.DateTimeComponents;
 import com.dexterous.flutterlocalnotifications.models.IconSource;
 import com.dexterous.flutterlocalnotifications.models.MessageDetails;
 import com.dexterous.flutterlocalnotifications.models.NotificationChannelAction;
 import com.dexterous.flutterlocalnotifications.models.NotificationChannelDetails;
+import com.dexterous.flutterlocalnotifications.models.NotificationChannelGroupDetails;
 import com.dexterous.flutterlocalnotifications.models.NotificationDetails;
 import com.dexterous.flutterlocalnotifications.models.PersonDetails;
 import com.dexterous.flutterlocalnotifications.models.ScheduledNotificationRepeatFrequency;
@@ -84,6 +87,8 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
     private static final String SELECT_NOTIFICATION = "SELECT_NOTIFICATION";
     private static final String SCHEDULED_NOTIFICATIONS = "scheduled_notifications";
     private static final String INITIALIZE_METHOD = "initialize";
+    private static final String CREATE_NOTIFICATION_CHANNEL_GROUP_METHOD = "createNotificationChannelGroup";
+    private static final String DELETE_NOTIFICATION_CHANNEL_GROUP_METHOD = "deleteNotificationChannelGroup";
     private static final String CREATE_NOTIFICATION_CHANNEL_METHOD = "createNotificationChannel";
     private static final String DELETE_NOTIFICATION_CHANNEL_METHOD = "deleteNotificationChannel";
     private static final String GET_ACTIVE_NOTIFICATIONS_METHOD = "getActiveNotifications";
@@ -704,6 +709,7 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
             if ((notificationChannel == null && (notificationChannelDetails.channelAction == null || notificationChannelDetails.channelAction == NotificationChannelAction.CreateIfNotExists)) || (notificationChannel != null && notificationChannelDetails.channelAction == NotificationChannelAction.Update)) {
                 notificationChannel = new NotificationChannel(notificationChannelDetails.id, notificationChannelDetails.name, notificationChannelDetails.importance);
                 notificationChannel.setDescription(notificationChannelDetails.description);
+                notificationChannel.setGroup(notificationChannelDetails.groupId);
                 if (notificationChannelDetails.playSound) {
                     AudioAttributes audioAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build();
                     Uri uri = retrieveSoundResourceUri(context, notificationChannelDetails.sound, notificationChannelDetails.soundSource);
@@ -771,6 +777,16 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
         zonedScheduleNotification(context, notificationDetails, true);
     }
 
+    static void zonedScheduleNextNotificationMatchingDateComponents(Context context, NotificationDetails notificationDetails) {
+        String nextFireDate = getNextFireDateMatchingDateTimeComponents(notificationDetails);
+        if (nextFireDate == null) {
+            return;
+        }
+        notificationDetails.scheduledDateTime = nextFireDate;
+        initAndroidThreeTen(context);
+        zonedScheduleNotification(context, notificationDetails, true);
+    }
+
     static String getNextFireDate(NotificationDetails notificationDetails) {
         if (VERSION.SDK_INT >= VERSION_CODES.O) {
             if (notificationDetails.scheduledNotificationRepeatFrequency == ScheduledNotificationRepeatFrequency.Daily) {
@@ -787,6 +803,45 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
             } else if (notificationDetails.scheduledNotificationRepeatFrequency == ScheduledNotificationRepeatFrequency.Weekly) {
                 org.threeten.bp.LocalDateTime localDateTime = org.threeten.bp.LocalDateTime.parse(notificationDetails.scheduledDateTime).plusWeeks(1);
                 return org.threeten.bp.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(localDateTime);
+            }
+        }
+        return null;
+    }
+
+    static String getNextFireDateMatchingDateTimeComponents(NotificationDetails notificationDetails) {
+        if (VERSION.SDK_INT >= VERSION_CODES.O) {
+            ZoneId zoneId = ZoneId.of(notificationDetails.timeZoneName);
+            ZonedDateTime scheduledDateTime = ZonedDateTime.of(LocalDateTime.parse(notificationDetails.scheduledDateTime), zoneId);
+            ZonedDateTime now = ZonedDateTime.now(zoneId);
+            ZonedDateTime nextFireDate = ZonedDateTime.of(now.getYear(), now.getMonthValue(), now.getDayOfMonth(), scheduledDateTime.getHour(), scheduledDateTime.getMinute(), scheduledDateTime.getSecond(), scheduledDateTime.getNano(), zoneId);
+            while (nextFireDate.isBefore(now)) {
+                // adjust to be a date in the future that matches the time
+                nextFireDate = nextFireDate.plusDays(1);
+            }
+            if (notificationDetails.matchDateTimeComponents == DateTimeComponents.Time) {
+                return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(nextFireDate);
+            } else if (notificationDetails.matchDateTimeComponents == DateTimeComponents.DayOfWeekAndTime) {
+                while (nextFireDate.getDayOfWeek() != scheduledDateTime.getDayOfWeek()) {
+                    nextFireDate = nextFireDate.plusDays(1);
+                }
+                return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(nextFireDate);
+            }
+        } else {
+            org.threeten.bp.ZoneId zoneId = org.threeten.bp.ZoneId.of(notificationDetails.timeZoneName);
+            org.threeten.bp.ZonedDateTime scheduledDateTime = org.threeten.bp.ZonedDateTime.of(org.threeten.bp.LocalDateTime.parse(notificationDetails.scheduledDateTime), zoneId);
+            org.threeten.bp.ZonedDateTime now = org.threeten.bp.ZonedDateTime.now(zoneId);
+            org.threeten.bp.ZonedDateTime nextFireDate = org.threeten.bp.ZonedDateTime.of(now.getYear(), now.getMonthValue(), now.getDayOfMonth(), scheduledDateTime.getHour(), scheduledDateTime.getMinute(), scheduledDateTime.getSecond(), scheduledDateTime.getNano(), zoneId);
+            while (nextFireDate.isBefore(now)) {
+                // adjust to be a date in the future that matches the time
+                nextFireDate = nextFireDate.plusDays(1);
+            }
+            if (notificationDetails.matchDateTimeComponents == DateTimeComponents.Time) {
+                return org.threeten.bp.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(nextFireDate);
+            } else if (notificationDetails.matchDateTimeComponents == DateTimeComponents.DayOfWeekAndTime) {
+                while (nextFireDate.getDayOfWeek() != scheduledDateTime.getDayOfWeek()) {
+                    nextFireDate = nextFireDate.plusDays(1);
+                }
+                return org.threeten.bp.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(nextFireDate);
             }
         }
         return null;
@@ -880,6 +935,12 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
             case PENDING_NOTIFICATION_REQUESTS_METHOD:
                 pendingNotificationRequests(result);
                 break;
+            case CREATE_NOTIFICATION_CHANNEL_GROUP_METHOD:
+                createNotificationChannelGroup(call, result);
+                break;
+            case DELETE_NOTIFICATION_CHANNEL_GROUP_METHOD:
+                deleteNotificationChannelGroup(call, result);
+                break;
             case CREATE_NOTIFICATION_CHANNEL_METHOD:
                 createNotificationChannel(call, result);
                 break;
@@ -938,6 +999,9 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
         Map<String, Object> arguments = call.arguments();
         NotificationDetails notificationDetails = extractNotificationDetails(result, arguments);
         if (notificationDetails != null) {
+            if (notificationDetails.matchDateTimeComponents != null) {
+                notificationDetails.scheduledDateTime = getNextFireDateMatchingDateTimeComponents(notificationDetails);
+            }
             zonedScheduleNotification(applicationContext, notificationDetails, true);
             result.success(null);
         }
@@ -1089,6 +1153,27 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
         return false;
     }
 
+    private void createNotificationChannelGroup(MethodCall call, Result result) {
+        if (VERSION.SDK_INT >= VERSION_CODES.O) {
+            Map<String, Object> arguments = call.arguments();
+            NotificationChannelGroupDetails notificationChannelGroupDetails = NotificationChannelGroupDetails.from(arguments);
+            NotificationManagerCompat notificationManagerCompat = getNotificationManager(applicationContext);
+            NotificationChannelGroup notificationChannelGroup = new NotificationChannelGroup(notificationChannelGroupDetails.id, notificationChannelGroupDetails.name);
+            if (VERSION.SDK_INT >= VERSION_CODES.P) {
+                notificationChannelGroup.setDescription(notificationChannelGroupDetails.description);
+            }
+            notificationManagerCompat.createNotificationChannelGroup(notificationChannelGroup);
+        }
+        result.success(null);
+    }
+
+    private void deleteNotificationChannelGroup(MethodCall call, Result result) {
+        NotificationManagerCompat notificationManagerCompat = getNotificationManager(applicationContext);
+        String groupId = call.arguments();
+        notificationManagerCompat.deleteNotificationChannelGroup(groupId);
+        result.success(null);
+    }
+
     private void createNotificationChannel(MethodCall call, Result result) {
         Map<String, Object> arguments = call.arguments();
         NotificationChannelDetails notificationChannelDetails = NotificationChannelDetails.from(arguments);
@@ -1097,12 +1182,10 @@ public class FlutterLocalNotificationsPlugin implements MethodCallHandler, Plugi
     }
 
     private void deleteNotificationChannel(MethodCall call, Result result) {
-        if (VERSION.SDK_INT >= VERSION_CODES.O) {
-            NotificationManager notificationManager = (NotificationManager) applicationContext.getSystemService(Context.NOTIFICATION_SERVICE);
-            String channelId = call.arguments();
-            notificationManager.deleteNotificationChannel(channelId);
-            result.success(null);
-        }
+        NotificationManagerCompat notificationManagerCompat = getNotificationManager(applicationContext);
+        String channelId = call.arguments();
+        notificationManagerCompat.deleteNotificationChannel(channelId);
+        result.success(null);
     }
 
     private void getActiveNotifications(Result result) {
